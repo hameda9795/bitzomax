@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -37,7 +36,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { 
   Tooltip,
@@ -46,71 +44,41 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { InfoIcon, LockIcon } from "lucide-react";
-
-// Mock song data for demonstration
-const mockSongs = [
-  {
-    id: "1",
-    title: "Summer Vibes",
-    artist: "DJ Sunshine",
-    genre: "Electronic",
-    duration: "3:45",
-    releaseDate: "2025-04-15",
-    isPremium: false,
-    uploadDate: "2025-05-01",
-  },
-  {
-    id: "2",
-    title: "Midnight Memories",
-    artist: "Luna Band",
-    genre: "Rock",
-    duration: "4:20",
-    releaseDate: "2025-03-22",
-    isPremium: true,
-    uploadDate: "2025-04-10",
-  },
-  {
-    id: "3",
-    title: "Rainy Days",
-    artist: "Cloudwalker",
-    genre: "Jazz",
-    duration: "5:15",
-    releaseDate: "2025-01-05",
-    isPremium: false,
-    uploadDate: "2025-02-20",
-  },
-  {
-    id: "4",
-    title: "Urban Jungle",
-    artist: "City Beats",
-    genre: "Hip-Hop",
-    duration: "3:22",
-    releaseDate: "2025-04-30",
-    isPremium: true,
-    uploadDate: "2025-05-02",
-  },
-  {
-    id: "5",
-    title: "Country Roads",
-    artist: "Mountain Echo",
-    genre: "Country",
-    duration: "4:10",
-    releaseDate: "2024-12-12",
-    isPremium: false,
-    uploadDate: "2025-01-15",
-  },
-];
+import { InfoIcon, LockIcon, Loader2 } from "lucide-react";
+import { useSongs } from "@/hooks/use-songs";
+import { Song } from "@/lib/services/song-service";
 
 export function SongsTable() {
-  const [songs, setSongs] = useState(mockSongs);
+  const { songs, loading, error, updateSong, deleteSong } = useSongs();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [filterPremium, setFilterPremium] = useState<boolean | null>(null);
-  const [songToDelete, setSongToDelete] = useState<string | null>(null);
+  const [songToDelete, setSongToDelete] = useState<number | null>(null);
   
+  // Format song duration
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds) return "0:00";
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  // Format date
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  // Check if a song is premium (this would depend on your backend implementation)
+  // For this example, we'll assume songs with "premium" in their genre field are premium
+  const isPremium = (song: Song) => {
+    return song.genre?.toLowerCase().includes('premium') || false;
+  };
+
   // Filter songs based on search term and filters
   const filteredSongs = songs.filter((song) => {
+    const songIsPremium = isPremium(song);
+    
     const matchesSearch =
       song.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       song.artist.toLowerCase().includes(searchTerm.toLowerCase());
@@ -118,44 +86,89 @@ export function SongsTable() {
     const matchesGenre = selectedGenre ? song.genre === selectedGenre : true;
     
     const matchesPremium =
-      filterPremium !== null ? song.isPremium === filterPremium : true;
+      filterPremium !== null ? songIsPremium === filterPremium : true;
     
     return matchesSearch && matchesGenre && matchesPremium;
   });
 
   // Handle song deletion
-  const handleDeleteSong = (id: string) => {
-    setSongs((prev) => prev.filter((song) => song.id !== id));
-    toast.success("Song deleted successfully");
-    setSongToDelete(null);
+  const handleDeleteSong = async (id: number) => {
+    try {
+      await deleteSong(id);
+      setSongToDelete(null);
+    } catch (error) {
+      console.error('Failed to delete song:', error);
+    }
   };
 
   // Handle song edit (in a real app, this would open an edit form)
-  const handleEditSong = (id: string) => {
+  const handleEditSong = (id: number) => {
     toast.info(`Editing song ${id}`);
     // In a real application, you would open an edit form or navigate to an edit page
   };
 
   // Handle premium status toggle
-  const handleTogglePremium = (id: string) => {
-    setSongs((prev) =>
-      prev.map((song) =>
-        song.id === id ? { ...song, isPremium: !song.isPremium } : song
-      )
-    );
-    const song = songs.find(song => song.id === id);
-    const newStatus = !song?.isPremium;
-    
-    if (newStatus) {
-      toast.success(`"${song?.title}" is now premium content. Free users can only listen to the first 30 seconds.`);
-    } else {
-      toast.success(`"${song?.title}" is now free content. All users can listen to the full song.`);
+  const handleTogglePremium = async (id: number, song: Song) => {
+    try {
+      // Update the genre to include or remove "premium" based on current state
+      const currentIsPremium = isPremium(song);
+      let newGenre = song.genre || '';
+      
+      if (currentIsPremium) {
+        // Remove premium from genre
+        newGenre = newGenre.replace(/premium/i, '').trim();
+        if (!newGenre) newGenre = 'Standard'; // Default if empty
+      } else {
+        // Add premium to genre
+        newGenre = newGenre ? `${newGenre} Premium` : 'Premium';
+      }
+      
+      await updateSong(id, { ...song, genre: newGenre });
+      
+      if (!currentIsPremium) {
+        toast.success(`"${song.title}" is now premium content. Free users can only listen to the first 30 seconds.`);
+      } else {
+        toast.success(`"${song.title}" is now free content. All users can listen to the full song.`);
+      }
+    } catch (error) {
+      console.error('Failed to update song premium status:', error);
+      toast.error('Failed to update song premium status');
     }
   };
 
   // Get stats
-  const premiumCount = songs.filter(song => song.isPremium).length;
-  const freeCount = songs.filter(song => !song.isPremium).length;
+  const premiumCount = songs.filter(song => isPremium(song)).length;
+  const freeCount = songs.length - premiumCount;
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Loading songs...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-center">
+          <p className="text-red-500 text-lg mb-2">Failed to load songs</p>
+          <p>{error}</p>
+          <Button 
+            variant="outline" 
+            onClick={() => window.location.reload()} 
+            className="mt-4"
+          >
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Get unique genres for filter
+  const genres = Array.from(new Set(songs.map(song => song.genre || 'Unknown')));
 
   return (
     <div className="space-y-4">
@@ -215,12 +228,9 @@ export function SongsTable() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Genres</SelectItem>
-              <SelectItem value="Electronic">Electronic</SelectItem>
-              <SelectItem value="Rock">Rock</SelectItem>
-              <SelectItem value="Jazz">Jazz</SelectItem>
-              <SelectItem value="Hip-Hop">Hip-Hop</SelectItem>
-              <SelectItem value="Country">Country</SelectItem>
-              <SelectItem value="Pop">Pop</SelectItem>
+              {genres.map((genre) => (
+                <SelectItem key={genre} value={genre}>{genre}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           
@@ -270,65 +280,68 @@ export function SongsTable() {
           </TableHeader>
           <TableBody>
             {filteredSongs.length > 0 ? (
-              filteredSongs.map((song) => (
-                <TableRow key={song.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      {song.title}
-                      {song.isPremium && <LockIcon size={14} className="text-yellow-500" />}
-                    </div>
-                  </TableCell>
-                  <TableCell>{song.artist}</TableCell>
-                  <TableCell>{song.genre}</TableCell>
-                  <TableCell>{song.duration}</TableCell>
-                  <TableCell>{song.releaseDate}</TableCell>
-                  <TableCell>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Badge variant={song.isPremium ? "default" : "secondary"} className={song.isPremium ? "bg-yellow-500 hover:bg-yellow-600" : ""}>
-                            {song.isPremium ? "Premium" : "Free"}
-                          </Badge>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {song.isPremium 
-                            ? "Free users can only listen to the first 30 seconds" 
-                            : "All users can listen to the full song"}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </TableCell>
-                  <TableCell>{song.uploadDate}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          Actions
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Manage Song</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleEditSong(song.id)}>
-                          Edit Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleTogglePremium(song.id)}>
-                          {song.isPremium 
-                            ? "Make Free (Full Access)" 
-                            : "Make Premium (30s Preview)"
-                          }
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-600"
-                          onClick={() => setSongToDelete(song.id)}
-                        >
-                          Delete Song
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
+              filteredSongs.map((song) => {
+                const songIsPremium = isPremium(song);
+                return (
+                  <TableRow key={song.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {song.title}
+                        {songIsPremium && <LockIcon size={14} className="text-yellow-500" />}
+                      </div>
+                    </TableCell>
+                    <TableCell>{song.artist}</TableCell>
+                    <TableCell>{song.genre || 'N/A'}</TableCell>
+                    <TableCell>{formatDuration(song.durationSeconds)}</TableCell>
+                    <TableCell>{formatDate(song.releaseDate)}</TableCell>
+                    <TableCell>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant={songIsPremium ? "default" : "secondary"} className={songIsPremium ? "bg-yellow-500 hover:bg-yellow-600" : ""}>
+                              {songIsPremium ? "Premium" : "Free"}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {songIsPremium 
+                              ? "Free users can only listen to the first 30 seconds" 
+                              : "All users can listen to the full song"}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableCell>
+                    <TableCell>{formatDate(song.createdAt)}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            Actions
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Manage Song</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleEditSong(song.id)}>
+                            Edit Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleTogglePremium(song.id, song)}>
+                            {songIsPremium 
+                              ? "Make Free (Full Access)" 
+                              : "Make Premium (30s Preview)"
+                            }
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onClick={() => setSongToDelete(song.id)}
+                          >
+                            Delete Song
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             ) : (
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-8 text-gray-500">

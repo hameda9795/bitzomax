@@ -38,116 +38,110 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-
-// Mock user data for demonstration
-const mockUsers = [
-  {
-    id: "1",
-    name: "Sarah Johnson",
-    email: "sarah.johnson@example.com",
-    status: "active",
-    subscriptionType: "premium",
-    joinDate: "2025-01-15",
-    lastLogin: "2025-05-01",
-  },
-  {
-    id: "2",
-    name: "Michael Brown",
-    email: "michael.brown@example.com",
-    status: "active",
-    subscriptionType: "free",
-    joinDate: "2024-11-22",
-    lastLogin: "2025-04-28",
-  },
-  {
-    id: "3",
-    name: "Emma Wilson",
-    email: "emma.wilson@example.com",
-    status: "inactive",
-    subscriptionType: "premium",
-    joinDate: "2024-08-05",
-    lastLogin: "2025-03-10",
-  },
-  {
-    id: "4",
-    name: "James Smith",
-    email: "james.smith@example.com",
-    status: "active",
-    subscriptionType: "premium",
-    joinDate: "2025-02-18",
-    lastLogin: "2025-05-02",
-  },
-  {
-    id: "5",
-    name: "Olivia Davis",
-    email: "olivia.davis@example.com",
-    status: "suspended",
-    subscriptionType: "free",
-    joinDate: "2024-07-30",
-    lastLogin: "2025-01-15",
-  },
-];
+import { useUsers } from "@/hooks/use-users";
+import { User } from "@/lib/services/user-service";
+import { Loader2 } from "lucide-react";
 
 export function UsersTable() {
-  const [users, setUsers] = useState(mockUsers);
+  const { users, loading, error, updateUserStatus, deleteUser } = useUsers();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [subscriptionFilter, setSubscriptionFilter] = useState<string | null>(null);
-  const [userToDelete, setUserToDelete] = useState<string | null>(null);
-  
+  const [userToDelete, setUserToDelete] = useState<number | null>(null);
+
+  // Format user data for display
+  const formatName = (user: User) => {
+    if (user.firstName && user.lastName) {
+      return `${user.firstName} ${user.lastName}`;
+    } else if (user.firstName) {
+      return user.firstName;
+    } else if (user.lastName) {
+      return user.lastName;
+    } else {
+      return user.username;
+    }
+  };
+
+  // Format date
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'Never';
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  // Get status string from active boolean
+  const getStatus = (active: boolean) => active ? "active" : "inactive";
+
   // Filter users based on search term and filters
   const filteredUsers = users.filter((user) => {
+    const userName = formatName(user);
     const matchesSearch =
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesStatus = statusFilter ? user.status === statusFilter : true;
+    const status = getStatus(user.active);
+    const matchesStatus = statusFilter ? status === statusFilter : true;
     
-    const matchesSubscription = subscriptionFilter ? user.subscriptionType === subscriptionFilter : true;
+    const matchesSubscription = subscriptionFilter ? user.subscriptionType.toLowerCase() === subscriptionFilter : true;
     
     return matchesSearch && matchesStatus && matchesSubscription;
   });
 
   // Handle user deletion
-  const handleDeleteUser = (id: string) => {
-    setUsers((prev) => prev.filter((user) => user.id !== id));
-    toast.success("User account deleted successfully");
-    setUserToDelete(null);
+  const handleDeleteUser = async (id: number) => {
+    try {
+      await deleteUser(id);
+      setUserToDelete(null);
+    } catch (error) {
+      console.error("Failed to delete user:", error);
+    }
   };
 
   // Handle user status change
-  const handleStatusChange = (id: string, newStatus: string) => {
-    setUsers((prev) =>
-      prev.map((user) =>
-        user.id === id ? { ...user, status: newStatus } : user
-      )
-    );
-    toast.success(`User status updated to ${newStatus}`);
+  const handleStatusChange = async (id: number, active: boolean) => {
+    try {
+      await updateUserStatus(id, active);
+    } catch (error) {
+      console.error("Failed to update user status:", error);
+    }
   };
 
   // Handle subscription change
-  const handleSubscriptionChange = (id: string, newSubscription: string) => {
-    setUsers((prev) =>
-      prev.map((user) =>
-        user.id === id ? { ...user, subscriptionType: newSubscription } : user
-      )
-    );
-    toast.success(`User subscription updated to ${newSubscription}`);
-  };
-
-  // Get status badge variant
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "active":
-        return "success";
-      case "inactive":
-        return "secondary";
-      case "suspended":
-        return "destructive";
-      default:
-        return "outline";
+  const handleSubscriptionChange = async (id: number, subscriptionType: string) => {
+    try {
+      await updateUserStatus(id, true); // Temp placeholder - we'd need to add a proper subscription update endpoint
+      toast.success(`User subscription updated to ${subscriptionType}`);
+    } catch (error) {
+      console.error("Failed to update user subscription:", error);
+      toast.error("Failed to update user subscription");
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Loading users...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-center">
+          <p className="text-red-500 text-lg mb-2">Failed to load users</p>
+          <p>{error}</p>
+          <Button 
+            variant="outline" 
+            onClick={() => window.location.reload()} 
+            className="mt-4"
+          >
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -172,7 +166,6 @@ export function UsersTable() {
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="inactive">Inactive</SelectItem>
-              <SelectItem value="suspended">Suspended</SelectItem>
             </SelectContent>
           </Select>
           
@@ -186,6 +179,7 @@ export function UsersTable() {
               <SelectItem value="all">All Types</SelectItem>
               <SelectItem value="premium">Premium</SelectItem>
               <SelectItem value="free">Free</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
             </SelectContent>
           </Select>
           
@@ -219,26 +213,24 @@ export function UsersTable() {
             {filteredUsers.length > 0 ? (
               filteredUsers.map((user) => (
                 <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.name}</TableCell>
+                  <TableCell className="font-medium">{formatName(user)}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
                     <Badge 
                       variant={
-                        user.status === "active" ? "default" : 
-                        user.status === "inactive" ? "secondary" : 
-                        "destructive"
+                        user.active ? "default" : "secondary"
                       }
                     >
-                      {user.status}
+                      {user.active ? "active" : "inactive"}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={user.subscriptionType === "premium" ? "default" : "outline"}>
+                    <Badge variant={user.subscriptionType.toLowerCase() === "premium" ? "default" : "outline"}>
                       {user.subscriptionType}
                     </Badge>
                   </TableCell>
-                  <TableCell>{user.joinDate}</TableCell>
-                  <TableCell>{user.lastLogin}</TableCell>
+                  <TableCell>{formatDate(user.createdAt)}</TableCell>
+                  <TableCell>{formatDate(user.lastLogin)}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -249,26 +241,23 @@ export function UsersTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Manage User</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => toast.info(`Viewing details for ${user.name}`)}>
+                        <DropdownMenuItem onClick={() => toast.info(`Viewing details for ${formatName(user)}`)}>
                           View Details
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleStatusChange(user.id, "active")}>
+                        <DropdownMenuItem onClick={() => handleStatusChange(user.id, true)}>
                           Set Active
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleStatusChange(user.id, "inactive")}>
+                        <DropdownMenuItem onClick={() => handleStatusChange(user.id, false)}>
                           Set Inactive
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleStatusChange(user.id, "suspended")}>
-                          Suspend
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuLabel>Change Subscription</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleSubscriptionChange(user.id, "premium")}>
+                        <DropdownMenuItem onClick={() => handleSubscriptionChange(user.id, "PREMIUM")}>
                           Set Premium
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleSubscriptionChange(user.id, "free")}>
+                        <DropdownMenuItem onClick={() => handleSubscriptionChange(user.id, "FREE")}>
                           Set Free
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />

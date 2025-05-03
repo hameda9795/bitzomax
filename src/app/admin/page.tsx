@@ -1,145 +1,197 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Music, Users, Settings, ListMusic, UserPlus } from "lucide-react";
+import { Music, Users, Clock, Activity, TrendingUp, ListMusic, UserPlus } from "lucide-react";
 import Link from "next/link";
-import DemoSubscriptionSwitcher from "@/components/abonnement/DemoSubscriptionSwitcher";
-
-export const metadata = {
-  title: 'Admin Dashboard | BitZoMax',
-  description: 'Beheer alle aspecten van het BitZoMax platform',
-};
+import { useUsers } from "@/hooks/use-users";
+import { useSongs } from "@/hooks/use-songs";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AdminDashboardPage() {
+  const { users, loading: usersLoading } = useUsers();
+  const { songs, loading: songsLoading } = useSongs();
+  const [premiumCount, setPremiumCount] = useState(0);
+  const [recentActive, setRecentActive] = useState(0);
+  
+  useEffect(() => {
+    // Count premium users
+    if (users.length > 0) {
+      const premium = users.filter(user => 
+        user.subscriptionType.toLowerCase().includes('premium')
+      ).length;
+      setPremiumCount(premium);
+      
+      // Count recently active users (last 7 days)
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const recent = users.filter(user => {
+        if (!user.lastLogin) return false;
+        const loginDate = new Date(user.lastLogin);
+        return loginDate > oneWeekAgo;
+      }).length;
+      setRecentActive(recent);
+    }
+  }, [users]);
+  
+  // Check if a song is premium (assuming "premium" in genre tag)
+  const isPremium = (genre: string | null) => {
+    return genre?.toLowerCase().includes('premium') || false;
+  };
+  
+  // Calculate premium songs count
+  const premiumSongsCount = songs.filter(song => isPremium(song.genre)).length;
+  
+  // Calculate recent songs (last 30 days)
+  const recentSongs = songs.filter(song => {
+    if (!song.createdAt) return false;
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setDate(oneMonthAgo.getDate() - 30);
+    const uploadDate = new Date(song.createdAt);
+    return uploadDate > oneMonthAgo;
+  }).length;
+  
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Admin Dashboard</h2>
         <p className="text-muted-foreground">
-          Beheer gebruikers, muziek en platforminstellingen
+          Manage users, music and platform settings
         </p>
       </div>
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Total Users */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
-              Totaal Gebruikers
+              Total Users
             </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,254</div>
-            <p className="text-xs text-muted-foreground">
-              +12.5% van vorige maand
-            </p>
+            {usersLoading ? (
+              <Skeleton className="h-6 w-20" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{users.length}</div>
+                <p className="text-xs text-muted-foreground">
+                  {recentActive} active in the last 7 days
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
         
+        {/* Premium Users */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
-              Premium Gebruikers
+              Premium Users
+            </CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {usersLoading ? (
+              <Skeleton className="h-6 w-20" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{premiumCount}</div>
+                <p className="text-xs text-muted-foreground">
+                  {users.length > 0 
+                    ? `${Math.round((premiumCount / users.length) * 100)}% of users`
+                    : "No users yet"}
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+        
+        {/* Total Songs */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">
+              Total Songs
             </CardTitle>
             <Music className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">642</div>
-            <p className="text-xs text-muted-foreground">
-              +18.2% van vorige maand
-            </p>
+            {songsLoading ? (
+              <Skeleton className="h-6 w-20" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{songs.length}</div>
+                <p className="text-xs text-muted-foreground">
+                  {recentSongs} added in the last 30 days
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
         
+        {/* Premium Content */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
-              Totaal Nummers
+              Premium Content
             </CardTitle>
             <ListMusic className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8,742</div>
-            <p className="text-xs text-muted-foreground">
-              +342 toegevoegd deze maand
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-      
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recente Activiteit</CardTitle>
-            <CardDescription>
-              De laatste activiteiten op het platform
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="rounded-full p-2 bg-muted">
-                  <UserPlus className="h-4 w-4" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">8 nieuwe gebruikers geregistreerd</p>
-                  <p className="text-xs text-muted-foreground">32 minuten geleden</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-4">
-                <div className="rounded-full p-2 bg-muted">
-                  <Music className="h-4 w-4" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">12 nieuwe nummers geüpload</p>
-                  <p className="text-xs text-muted-foreground">1 uur geleden</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-4">
-                <div className="rounded-full p-2 bg-muted">
-                  <Settings className="h-4 w-4" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Systeemupdate voltooid</p>
-                  <p className="text-xs text-muted-foreground">3 uur geleden</p>
-                </div>
-              </div>
-            </div>
+            {songsLoading ? (
+              <Skeleton className="h-6 w-20" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{premiumSongsCount}</div>
+                <p className="text-xs text-muted-foreground">
+                  {songs.length > 0 
+                    ? `${Math.round((premiumSongsCount / songs.length) * 100)}% of content`
+                    : "No songs yet"}
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
         
-        <DemoSubscriptionSwitcher />
-      </div>
-      
-      <div className="grid gap-6">
-        <Card>
+        {/* Quick Access */}
+        <Card className="md:col-span-2 lg:col-span-3">
           <CardHeader>
-            <CardTitle>Snelle acties</CardTitle>
+            <CardTitle>Quick Actions</CardTitle>
             <CardDescription>
-              Veelgebruikte beheertools
+              Perform common admin tasks quickly
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Link href="/admin/songs">
-                <Button className="w-full" variant="outline">
-                  <Music className="mr-2 h-4 w-4" />
-                  Beheer Nummers
-                </Button>
-              </Link>
-              
+            <div className="flex flex-wrap gap-4">
               <Link href="/admin/users">
-                <Button className="w-full" variant="outline">
-                  <Users className="mr-2 h-4 w-4" />
-                  Beheer Gebruikers
+                <Button variant="outline" className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Manage Users
                 </Button>
               </Link>
-              
-              <Link href="#">
-                <Button className="w-full" variant="outline">
-                  <Settings className="mr-2 h-4 w-4" />
-                  Systeeminstellingen
+              <Link href="/admin/songs">
+                <Button variant="outline" className="flex items-center gap-2">
+                  <Music className="h-4 w-4" />
+                  Manage Songs
+                </Button>
+              </Link>
+              <Link href="/admin/songs">
+                <Button variant="outline" className="flex items-center gap-2">
+                  <Activity className="h-4 w-4" />
+                  View Analytics
+                </Button>
+              </Link>
+              <Link href="/admin/users">
+                <Button variant="outline" className="flex items-center gap-2">
+                  <UserPlus className="h-4 w-4" />
+                  Add New User
+                </Button>
+              </Link>
+              <Link href="/admin/settings">
+                <Button variant="outline" className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Scheduled Tasks
                 </Button>
               </Link>
             </div>
