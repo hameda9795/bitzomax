@@ -46,10 +46,10 @@ import {
 import { toast } from "sonner";
 import { InfoIcon, LockIcon, Loader2 } from "lucide-react";
 import { useSongs } from "@/hooks/use-songs";
-import { Song } from "@/lib/services/song-service";
+import { SongService, Song } from "@/lib/services/song-service";
 
 export function SongsTable() {
-  const { songs, loading, error, updateSong, deleteSong } = useSongs();
+  const { songs, loading, error, fetchSongs } = useSongs();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [filterPremium, setFilterPremium] = useState<boolean | null>(null);
@@ -60,10 +60,10 @@ export function SongsTable() {
     title: "",
     artist: "",
     genre: "",
-    releaseDate: ""
+    releaseDate: "",
+    durationSeconds: ""
   });
   
-  // Format song duration
   const formatDuration = (seconds: number | null) => {
     if (!seconds) return "0:00";
     const minutes = Math.floor(seconds / 60);
@@ -71,19 +71,15 @@ export function SongsTable() {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  // Format date
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString();
   };
 
-  // Check if a song is premium (this would depend on your backend implementation)
-  // For this example, we'll assume songs with "premium" in their genre field are premium
   const isPremium = (song: Song) => {
     return song.genre?.toLowerCase().includes('premium') || false;
   };
 
-  // Filter songs based on search term and filters
   const filteredSongs = songs.filter((song) => {
     const songIsPremium = isPremium(song);
     
@@ -99,17 +95,18 @@ export function SongsTable() {
     return matchesSearch && matchesGenre && matchesPremium;
   });
 
-  // Handle song deletion
   const handleDeleteSong = async (id: number) => {
     try {
-      await deleteSong(id);
+      await SongService.adminDeleteSong(id);
+      toast.success("Song deleted successfully");
       setSongToDelete(null);
+      fetchSongs();
     } catch (error) {
       console.error('Failed to delete song:', error);
+      toast.error("Failed to delete song");
     }
   };
 
-  // Handle song edit (in a real app, this would open an edit form)
   const handleEditSong = (id: number) => {
     const songToEdit = songs.find(song => song.id === id);
     if (songToEdit) {
@@ -118,42 +115,40 @@ export function SongsTable() {
         title: songToEdit.title || "",
         artist: songToEdit.artist || "",
         genre: songToEdit.genre || "",
-        releaseDate: songToEdit.releaseDate ? new Date(songToEdit.releaseDate).toISOString().split('T')[0] : ""
+        releaseDate: songToEdit.releaseDate ? new Date(songToEdit.releaseDate).toISOString().split('T')[0] : "",
+        durationSeconds: songToEdit.durationSeconds?.toString() || ""
       });
       setIsEditModalOpen(true);
     }
   };
 
-  // Handle premium status toggle
   const handleTogglePremium = async (id: number, song: Song) => {
     try {
-      // Update the genre to include or remove "premium" based on current state
       const currentIsPremium = isPremium(song);
       let newGenre = song.genre || '';
       
       if (currentIsPremium) {
-        // Remove premium from genre
         newGenre = newGenre.replace(/premium/i, '').trim();
-        if (!newGenre) newGenre = 'Standard'; // Default if empty
+        if (!newGenre) newGenre = 'Standard';
       } else {
-        // Add premium to genre
         newGenre = newGenre ? `${newGenre} Premium` : 'Premium';
       }
       
-      await updateSong(id, { ...song, genre: newGenre });
+      await SongService.adminUpdateSong(id, { ...song, genre: newGenre });
       
       if (!currentIsPremium) {
         toast.success(`"${song.title}" is now premium content. Free users can only listen to the first 30 seconds.`);
       } else {
         toast.success(`"${song.title}" is now free content. All users can listen to the full song.`);
       }
+      
+      fetchSongs();
     } catch (error) {
       console.error('Failed to update song premium status:', error);
       toast.error('Failed to update song premium status');
     }
   };
 
-  // Get stats
   const premiumCount = songs.filter(song => isPremium(song)).length;
   const freeCount = songs.length - premiumCount;
 
@@ -174,7 +169,7 @@ export function SongsTable() {
           <p>{error}</p>
           <Button 
             variant="outline" 
-            onClick={() => window.location.reload()} 
+            onClick={() => fetchSongs()} 
             className="mt-4"
           >
             Retry
@@ -184,7 +179,6 @@ export function SongsTable() {
     );
   }
 
-  // Get unique genres for filter
   const genres = Array.from(new Set(songs.map(song => song.genre || 'Unknown')));
 
   return (
@@ -383,16 +377,13 @@ export function SongsTable() {
         </Table>
       </div>
       
-      {/* Delete Confirmation Dialog */}
       {!!songToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Custom solid overlay */}
           <div 
             className="fixed inset-0 bg-black" 
             onClick={() => setSongToDelete(null)}
           />
           
-          {/* Modal content */}
           <div className="relative z-50 w-full max-w-md bg-[#f8f5e9] p-6 shadow-xl">
             <div className="mb-6 border-b border-gray-300 pb-4">
               <h2 className="text-xl font-normal text-[#8a7a57]">Are you sure?</h2>
@@ -421,10 +412,8 @@ export function SongsTable() {
         </div>
       )}
       
-      {/* Edit Song Modal */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Custom solid overlay */}
           <div 
             className="fixed inset-0 bg-black" 
             onClick={() => {
@@ -433,7 +422,6 @@ export function SongsTable() {
             }}
           />
           
-          {/* Modal content */}
           <div className="relative z-50 w-full max-w-2xl bg-[#f8f5e9] p-6 shadow-xl">
             <div className="mb-6 border-b border-gray-300 pb-4">
               <h2 className="text-xl font-normal text-[#8a7a57]">Edit Song Details</h2>
@@ -486,6 +474,18 @@ export function SongsTable() {
                   className="col-span-3 bg-white border-gray-300"
                 />
               </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label htmlFor="durationSeconds" className="text-right text-sm font-medium text-[#8a7a57]">
+                  Duration (seconds)
+                </label>
+                <Input
+                  id="durationSeconds"
+                  type="number"
+                  value={editFormData.durationSeconds}
+                  onChange={(e) => setEditFormData({...editFormData, durationSeconds: e.target.value})}
+                  className="col-span-3 bg-white border-gray-300"
+                />
+              </div>
             </div>
             
             <div className="mt-6 border-t border-gray-300 pt-4 flex justify-end gap-2">
@@ -503,17 +503,24 @@ export function SongsTable() {
                 className="bg-[#b49469] hover:bg-[#96784f] text-white border-none"
                 onClick={() => {
                   if (songToEdit) {
-                    updateSong(songToEdit.id, {
+                    // Parse duration as number or keep original if invalid
+                    const durationSeconds = editFormData.durationSeconds ? 
+                      parseInt(editFormData.durationSeconds, 10) || songToEdit.durationSeconds : 
+                      songToEdit.durationSeconds;
+                      
+                    SongService.adminUpdateSong(songToEdit.id, {
                       ...songToEdit,
-                      title: editFormData.title,
-                      artist: editFormData.artist,
-                      genre: editFormData.genre,
-                      releaseDate: editFormData.releaseDate
+                      title: editFormData.title || songToEdit.title,
+                      artist: editFormData.artist || songToEdit.artist,
+                      genre: editFormData.genre || songToEdit.genre,
+                      releaseDate: editFormData.releaseDate || songToEdit.releaseDate,
+                      durationSeconds: durationSeconds
                     })
                       .then(() => {
                         setIsEditModalOpen(false);
                         setSongToEdit(null);
                         toast.success("Song details updated successfully");
+                        fetchSongs();
                       })
                       .catch((error) => {
                         console.error("Failed to update song:", error);

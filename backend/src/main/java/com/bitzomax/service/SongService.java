@@ -3,6 +3,8 @@ package com.bitzomax.service;
 import com.bitzomax.model.Song;
 import com.bitzomax.repository.SongRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -37,6 +39,23 @@ public class SongService {
     
     public List<Song> searchSongsByAlbum(String album) {
         return songRepository.findByAlbumContainingIgnoreCase(album);
+    }
+    
+    /**
+     * Get the latest songs added to the system
+     * @param limit Maximum number of songs to return
+     * @return List of most recently added songs
+     */
+    public List<Song> getLatestSongs(int limit) {
+        return songRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(0, limit));
+    }
+    
+    /**
+     * Get a list of all genres available in the system
+     * @return List of unique genre names
+     */
+    public List<String> getAllGenres() {
+        return songRepository.findDistinctGenres();
     }
     
     public Song createSong(Song song) {

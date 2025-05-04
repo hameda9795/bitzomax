@@ -36,6 +36,8 @@ public class WebSecurityConfig {
             .csrf().disable()
             .authorizeHttpRequests(requests -> requests
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/home/**").permitAll() // Allow public access to home endpoints
+                .requestMatchers("/api/admin/files/upload/**").permitAll() // Allow file uploads without authentication temporarily
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
             .sessionManagement()

@@ -51,6 +51,7 @@ interface SongFormData {
   genre?: string;
   releaseDate?: string;
   isPremium: boolean;
+  durationSeconds?: number;
 }
 
 export function SongUploadForm({ onComplete }: SongUploadFormProps) {
@@ -60,6 +61,8 @@ export function SongUploadForm({ onComplete }: SongUploadFormProps) {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isPremium, setIsPremium] = useState(false);
+  const [duration, setDuration] = useState<string>("");
+  const [extractingMetadata, setExtractingMetadata] = useState(false);
 
   const {
     register,
@@ -73,6 +76,23 @@ export function SongUploadForm({ onComplete }: SongUploadFormProps) {
       const file = e.target.files[0];
       if (file.type.startsWith("audio/")) {
         setSongFile(file);
+        
+        // Extract duration from the audio file
+        setExtractingMetadata(true);
+        const audio = new Audio();
+        audio.src = URL.createObjectURL(file);
+        
+        audio.onloadedmetadata = () => {
+          const durationInSeconds = Math.round(audio.duration);
+          setDuration(durationInSeconds.toString());
+          setExtractingMetadata(false);
+        };
+        
+        audio.onerror = () => {
+          setExtractingMetadata(false);
+          // Could not extract metadata automatically
+          console.error("Could not extract metadata from audio file");
+        };
       } else {
         toast.error("Please upload a valid audio file");
         e.target.value = '';
@@ -163,7 +183,7 @@ export function SongUploadForm({ onComplete }: SongUploadFormProps) {
         album: data.album || null,
         genre: finalGenre,
         releaseDate: data.releaseDate || null,
-        durationSeconds: null, // This will be calculated by backend
+        durationSeconds: duration ? parseInt(duration, 10) : null,
         filePath: songFilePath,
         coverArtUrl: coverArtUrl
       };
@@ -180,6 +200,7 @@ export function SongUploadForm({ onComplete }: SongUploadFormProps) {
       setSongFile(null);
       setCoverFile(null);
       setIsPremium(false);
+      setDuration("");
       
       // Close the form
       onComplete();
@@ -298,6 +319,19 @@ export function SongUploadForm({ onComplete }: SongUploadFormProps) {
               <Label htmlFor="premium" className="font-normal cursor-pointer">Premium</Label>
             </div>
           </div>
+        </div>
+
+        {/* Duration */}
+        <div className="space-y-2">
+          <Label htmlFor="duration">Duration (seconds)</Label>
+          <Input
+            id="duration"
+            type="number"
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+            placeholder="Enter duration in seconds (optional)"
+            disabled={isUploading || extractingMetadata}
+          />
         </div>
       </div>
 

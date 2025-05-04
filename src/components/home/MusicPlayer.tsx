@@ -10,7 +10,9 @@ import {
   VolumeX,
   Repeat,
   Shuffle,
-  Lock
+  Lock,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
@@ -20,27 +22,19 @@ import { useSubscription } from '@/lib/subscription-context';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useRouter } from 'next/navigation';
+import homeService, { Song } from '@/lib/services/home-service';
 
-// Mock data for a sample song with lyrics
-const sampleSong = {
-  id: 1,
-  title: 'Zomernachten',
-  artist: 'Lisa de Jong',
-  audioUrl: '/music/sample.mp3', // This would be a real audio file in production
-  coverUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8bXVzaWN8ZW58MHx8MHx8fDA%3D',
-  isPremium: true, // Added premium flag
-  lyrics: [
-    { time: 0, text: 'Wacht op het juiste moment...' },
-    { time: 5, text: 'De zon zakt in de zee' },
-    { time: 10, text: 'Zomernachten zijn voor jou en mij' },
-    { time: 15, text: 'Warme wind streelt onze huid' },
-    { time: 20, text: 'Onder de sterrenhemel' },
-    { time: 25, text: 'Dansen we tot de ochtend komt' },
-    { time: 30, text: 'Deze nacht lijkt eindeloos' },
-    { time: 35, text: 'Zomernachten, zomernachten' },
-    { time: 40, text: 'Voor altijd in mijn hart' },
-  ]
-};
+// Type for lyrics
+interface Lyric {
+  time: number;
+  text: string;
+}
+
+// Type for song with lyrics
+interface SongWithLyrics extends Song {
+  lyrics?: Lyric[];
+  isPremium?: boolean;
+}
 
 export const MusicPlayer = () => {
   // State for the player
@@ -52,6 +46,9 @@ export const MusicPlayer = () => {
   const [currentLyric, setCurrentLyric] = useState('');
   const [nextLyric, setNextLyric] = useState('');
   const [showPremiumDialog, setShowPremiumDialog] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const [featuredSong, setFeaturedSong] = useState<SongWithLyrics | null>(null);
   
   // Use subscription context
   const { isSubscribed } = useSubscription();
@@ -63,13 +60,87 @@ export const MusicPlayer = () => {
   // References
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationRef = useRef<number | null>(null);
+
+  // Try real audio playback first, fallback to animation if needed
+  const [usingAnimationFallback, setUsingAnimationFallback] = useState(false);
+
+  // Fetch featured song from API
+  useEffect(() => {
+    const loadFeaturedSong = async () => {
+      setIsLoading(true);
+      try {
+        const featuredContent = await homeService.getFeaturedContent();
+        if (featuredContent.featuredSongs && featuredContent.featuredSongs.length > 0) {
+          // Get first song from featured content
+          const song = featuredContent.featuredSongs[0];
+          
+          // Check if the song is premium by checking if genre contains "Premium"
+          const isPremium = song.genre?.toLowerCase().includes('premium') || false;
+          
+          // For demo purposes, we'll add lyrics
+          const songWithLyrics: SongWithLyrics = {
+            ...song,
+            isPremium: isPremium,
+            lyrics: [
+              { time: 0, text: 'Wacht op het juiste moment...' },
+              { time: 5, text: 'De muziek begint te spelen' },
+              { time: 10, text: `${song.title} - ${song.artist}` },
+              { time: 15, text: 'Muziek vult de kamer' },
+              { time: 20, text: 'Luister naar de melodie' },
+              { time: 25, text: 'Geniet van de muziek' },
+              { time: 30, text: 'Het ritme neemt je mee' },
+              { time: 35, text: 'Laat de muziek je meenemen' },
+              { time: 40, text: 'Dit is het einde van het nummer' },
+            ]
+          };
+          
+          setFeaturedSong(songWithLyrics);
+          setDuration(song.durationSeconds || 90); // Use actual duration if available, otherwise default to 90
+          
+          // Pre-check if we can access the audio file
+          // If we can't, set up animation fallback immediately
+          if (isPremium && !isSubscribed) {
+            console.log("Premium song detected for non-subscriber, preparing animation fallback");
+            setUsingAnimationFallback(true);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load featured song:', error);
+        setAudioError('Er is een probleem opgetreden bij het laden van de muziek.');
+        setUsingAnimationFallback(true); // Use animation fallback when we can't load songs
+        
+        // Create a mock song since we couldn't load from the API
+        const mockSong: SongWithLyrics = {
+          id: 'local-1',
+          title: 'Demo Track',
+          artist: 'Bitzomax Demo',
+          album: 'Test Album',
+          genre: 'Pop',
+          coverArtUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=800&auto=format&fit=crop',
+          durationSeconds: 90,
+          isPremium: false,
+          lyrics: [
+            { time: 0, text: 'Test lyrics for local playback...' },
+            { time: 5, text: 'This is a demo track' },
+            { time: 10, text: 'Used when API is not available' },
+            { time: 15, text: 'Muziek vult de kamer' },
+            { time: 20, text: 'Luister naar de melodie' },
+            { time: 30, text: 'Het ritme neemt je mee' },
+          ]
+        };
+        setFeaturedSong(mockSong);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadFeaturedSong();
+  }, [isSubscribed]);
   
-  // For demonstration, since we don't have real audio files
+  // Set volume when it changes
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = volume;
-      // Simulate a song duration
-      setDuration(90);
     }
     
     return () => {
@@ -79,97 +150,188 @@ export const MusicPlayer = () => {
     };
   }, [volume]);
   
+  // Use the actual audio element's timeupdate event to update the current time
+  useEffect(() => {
+    if (!audioRef.current) return;
+    
+    const handleTimeUpdate = () => {
+      if (audioRef.current) {
+        // Update the currentTime state with the actual audio current time
+        setCurrentTime(audioRef.current.currentTime);
+      }
+    };
+    
+    const handleLoadedMetadata = () => {
+      if (audioRef.current) {
+        // Update the duration state with the actual audio duration
+        setDuration(audioRef.current.duration);
+        setAudioError(null);
+        setUsingAnimationFallback(false);
+      }
+    };
+    
+    const handleAudioError = (e: Event) => {
+      console.error('Audio element error:', e);
+      setAudioError('Er is een probleem met het afspelen. Animatiemodus wordt gebruikt.');
+      setUsingAnimationFallback(true);
+    };
+    
+    // Add event listeners to audio element
+    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
+    audioRef.current.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audioRef.current.addEventListener('error', handleAudioError);
+    
+    // Clean up event listeners
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+        audioRef.current.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        audioRef.current.removeEventListener('error', handleAudioError);
+      }
+    };
+  }, [audioRef.current]);
+  
+  // Handle animation for time updates when using fallback mode
+  useEffect(() => {
+    if (isPlaying && usingAnimationFallback) {
+      const animate = () => {
+        setCurrentTime((prevTime) => {
+          // Slow down the animation to match real-time playback
+          // Increment by only 0.03 seconds each frame (approximately 1 second real-time per second)
+          const newTime = prevTime + 0.03;
+          
+          // For premium content, restrict playback to 30 seconds for free users
+          if (featuredSong?.isPremium && !isSubscribed && newTime >= 30) {
+            return 30;
+          }
+          
+          // Loop back to beginning when reaching the end
+          return newTime >= duration ? 0 : newTime;
+        });
+        
+        animationRef.current = requestAnimationFrame(animate);
+      };
+      
+      // Start animation
+      animationRef.current = requestAnimationFrame(animate);
+      
+      // Clean up animation on unmount or when stopped
+      return () => {
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+          animationRef.current = null;
+        }
+      };
+    } else if (animationRef.current) {
+      // Cancel animation if not playing or not using fallback
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+  }, [isPlaying, usingAnimationFallback, duration, isSubscribed, featuredSong]);
+  
   // Update lyrics based on current time
   useEffect(() => {
     const findCurrentLyric = () => {
-      const currentIndex = sampleSong.lyrics.findIndex(
+      if (!featuredSong || !featuredSong.lyrics) return;
+      
+      const lyrics = featuredSong.lyrics;
+      
+      const currentIndex = lyrics.findIndex(
         (lyric, index) => 
           currentTime >= lyric.time && 
-          (index === sampleSong.lyrics.length - 1 || currentTime < sampleSong.lyrics[index + 1].time)
+          (index === lyrics.length - 1 || currentTime < lyrics[index + 1].time)
       );
       
       if (currentIndex !== -1) {
-        setCurrentLyric(sampleSong.lyrics[currentIndex].text);
+        setCurrentLyric(lyrics[currentIndex].text);
         
-        if (currentIndex < sampleSong.lyrics.length - 1) {
-          setNextLyric(sampleSong.lyrics[currentIndex + 1].text);
+        if (currentIndex < lyrics.length - 1) {
+          setNextLyric(lyrics[currentIndex + 1].text);
         } else {
           setNextLyric('');
         }
       } else {
         setCurrentLyric('');
-        if (sampleSong.lyrics.length > 0) {
-          setNextLyric(sampleSong.lyrics[0].text);
+        if (lyrics.length > 0) {
+          setNextLyric(lyrics[0].text);
         }
       }
     };
     
     findCurrentLyric();
-  }, [currentTime]);
+  }, [currentTime, featuredSong]);
   
   // Check for premium content restriction
   useEffect(() => {
-    if (sampleSong.isPremium && !isSubscribed && currentTime >= 30 && !isRestricted) {
+    if (featuredSong?.isPremium && !isSubscribed && currentTime >= 30 && !isRestricted) {
       setIsPlaying(false);
       setIsRestricted(true);
       setShowPremiumDialog(true);
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    }
-  }, [currentTime, isSubscribed, isRestricted]);
-  
-  // Animation for time update in demo mode
-  useEffect(() => {
-    if (isPlaying) {
-      const animate = () => {
-        setCurrentTime((prevTime) => {
-          const newTime = prevTime + 0.1;
-          
-          // For premium content, restrict playback to 30 seconds for free users
-          if (sampleSong.isPremium && !isSubscribed && newTime >= 30) {
-            return 30;
-          }
-          
-          return newTime >= duration ? 0 : newTime;
-        });
-        animationRef.current = requestAnimationFrame(animate);
-      };
       
-      animationRef.current = requestAnimationFrame(animate);
-    } else if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
-    }
-    
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
+      if (audioRef.current) {
+        audioRef.current.pause();
       }
-    };
-  }, [isPlaying, duration, isSubscribed]);
+    }
+  }, [currentTime, isSubscribed, isRestricted, featuredSong]);
+  
+  // Helper function to get the audio source URL
+  const getAudioSourceUrl = () => {
+    if (!featuredSong?.id) return '';
+    
+    // Use the direct stream endpoint for the song
+    return `/api/songs/stream/${featuredSong.id}`;
+  };
   
   // Player controls
   const togglePlayPause = () => {
     // Don't allow play to resume if the song is restricted
-    if (sampleSong.isPremium && !isSubscribed && currentTime >= 30) {
+    if (featuredSong?.isPremium && !isSubscribed && currentTime >= 30) {
       setShowPremiumDialog(true);
       return;
     }
-    setIsPlaying(!isPlaying);
+    
+    // Actually play or pause the audio element
+    if (!isPlaying) {
+      setIsPlaying(true);
+      
+      if (audioRef.current && !usingAnimationFallback) {
+        const playPromise = audioRef.current.play();
+        
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error("Error playing audio:", error);
+            setUsingAnimationFallback(true);
+          });
+        }
+      }
+    } else {
+      setIsPlaying(false);
+      
+      if (audioRef.current && !usingAnimationFallback) {
+        audioRef.current.pause();
+      }
+    }
   };
   
   const handleTimeChange = (value: number[]) => {
     const newTime = value[0];
     
     // Don't allow seeking past 30 seconds for premium content if not subscribed
-    if (sampleSong.isPremium && !isSubscribed && newTime > 30) {
+    if (featuredSong?.isPremium && !isSubscribed && newTime > 30) {
       setCurrentTime(30);
+      if (audioRef.current) {
+        audioRef.current.currentTime = 30;
+      }
       setIsRestricted(true);
       setShowPremiumDialog(true);
       return;
     }
     
+    // Update the audio element's current time
     setCurrentTime(newTime);
+    if (audioRef.current && !usingAnimationFallback) {
+      audioRef.current.currentTime = newTime;
+    }
   };
   
   const handleVolumeChange = (value: number[]) => {
@@ -201,6 +363,31 @@ export const MusicPlayer = () => {
     }
     setIsMuted(!isMuted);
   };
+
+  // Try again with audio playback
+  const handleRetryAudio = () => {
+    if (usingAnimationFallback && featuredSong?.id) {
+      setAudioError(null);
+      setUsingAnimationFallback(false);
+      
+      // Force reload the audio element
+      if (audioRef.current) {
+        const wasPlaying = isPlaying;
+        audioRef.current.src = getAudioSourceUrl();
+        audioRef.current.load();
+        
+        if (wasPlaying) {
+          const playPromise = audioRef.current.play();
+          if (playPromise) {
+            playPromise.catch(() => {
+              setUsingAnimationFallback(true);
+              setAudioError('Kan audio niet afspelen. Animatiemodus wordt gebruikt.');
+            });
+          }
+        }
+      }
+    }
+  };
   
   const handleUpgradeClick = () => {
     setShowPremiumDialog(false);
@@ -213,6 +400,27 @@ export const MusicPlayer = () => {
     const seconds = Math.floor(timeInSeconds % 60);
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
+
+  if (isLoading) {
+    return (
+      <Card className="w-full shadow-md">
+        <CardContent className="p-6 flex justify-center items-center" style={{ height: '300px' }}>
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2">Muziek laden...</span>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!featuredSong) {
+    return (
+      <Card className="w-full shadow-md">
+        <CardContent className="p-6 flex justify-center items-center" style={{ height: '300px' }}>
+          <p>Geen muziek beschikbaar. Probeer het later nog eens.</p>
+        </CardContent>
+      </Card>
+    );
+  }
   
   return (
     <>
@@ -222,11 +430,11 @@ export const MusicPlayer = () => {
             {/* Cover Art */}
             <div className="w-full md:w-48 h-48 rounded-md overflow-hidden relative flex-shrink-0">
               <img 
-                src={sampleSong.coverUrl} 
-                alt={`${sampleSong.title} - ${sampleSong.artist}`}
+                src={featuredSong.coverArtUrl || 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=800&auto=format&fit=crop'} 
+                alt={`${featuredSong.title} - ${featuredSong.artist}`}
                 className="w-full h-full object-cover"
               />
-              {sampleSong.isPremium && (
+              {featuredSong.isPremium && (
                 <Badge className="absolute top-2 right-2 bg-yellow-500/80 hover:bg-yellow-500">
                   Premium
                 </Badge>
@@ -237,14 +445,17 @@ export const MusicPlayer = () => {
             <div className="flex-1 flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-semibold">{sampleSong.title}</h2>
-                  {sampleSong.isPremium && (
+                  <h2 className="text-xl font-semibold">{featuredSong.title}</h2>
+                  {featuredSong.isPremium && (
                     <Badge variant="outline" className="text-yellow-500 border-yellow-500">
                       Premium
                     </Badge>
                   )}
                 </div>
-                <p className="text-muted-foreground">{sampleSong.artist}</p>
+                <p className="text-muted-foreground">{featuredSong.artist}</p>
+                {featuredSong.album && (
+                  <p className="text-sm text-muted-foreground">Album: {featuredSong.album}</p>
+                )}
               </div>
               
               {/* Progress Bar */}
@@ -261,7 +472,7 @@ export const MusicPlayer = () => {
                   <span>{formatTime(currentTime)}</span>
                   <span>{formatTime(duration)}</span>
                 </div>
-                {sampleSong.isPremium && !isSubscribed && (
+                {featuredSong.isPremium && !isSubscribed && (
                   <div className="text-xs text-amber-600 flex items-center gap-1">
                     <Lock size={12} />
                     {isRestricted ? 
@@ -271,6 +482,22 @@ export const MusicPlayer = () => {
                   </div>
                 )}
               </div>
+              
+              {/* Error Message */}
+              {audioError && (
+                <div className="mt-2 p-2 bg-red-50 text-red-600 rounded-md text-sm flex items-center gap-2">
+                  <AlertCircle size={16} />
+                  <span>{audioError}</span>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="ml-auto" 
+                    onClick={handleRetryAudio}
+                  >
+                    Opnieuw proberen
+                  </Button>
+                </div>
+              )}
               
               {/* Playback Controls */}
               <div className="flex items-center justify-center gap-4 mt-2">
@@ -337,13 +564,27 @@ export const MusicPlayer = () => {
               </p>
             </div>
           </div>
+          
+          {/* Audio Mode Display */}
+          <div className="mt-4 text-xs text-muted-foreground flex justify-between items-center">
+            <span>Speelduur: {formatTime(duration)}</span>
+            <div className="flex items-center gap-1">
+              <span>Audio modus:</span>
+              {usingAnimationFallback ? (
+                <Badge variant="outline" className="text-blue-500 border-blue-500">Animatie (Zonder geluid)</Badge>
+              ) : (
+                <Badge variant="outline" className="text-green-500 border-green-500">Audio Stream</Badge>
+              )}
+            </div>
+          </div>
         </CardContent>
         
-        {/* Audio element - would use real audio in production */}
-        <audio ref={audioRef} preload="metadata">
-          <source src={sampleSong.audioUrl} type="audio/mpeg" />
-          Your browser does not support the audio element.
-        </audio>
+        {/* Audio element */}
+        <audio 
+          ref={audioRef} 
+          preload="metadata"
+          src={getAudioSourceUrl()}
+        />
       </Card>
       
       {/* Premium upgrade dialog */}

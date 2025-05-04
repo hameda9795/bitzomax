@@ -23,6 +23,13 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
     @Autowired
     private JwtUtil jwtUtil;
+    
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        String path = request.getRequestURI();
+        // Skip JWT validation for file upload endpoints
+        return path.startsWith("/api/admin/files/upload/");
+    }
 
     @Override
     protected void doFilterInternal(
