@@ -70,17 +70,16 @@ public class FileController {
     }
 
     private ResponseEntity<Resource> downloadFile(String fileName, HttpServletRequest request, Resource resource) {
-        // Try to determine file's content type
-        String contentType = null;
+        String contentType;
         try {
             contentType = request.getServletContext().getMimeType(resource.getFile().getAbsolutePath());
         } catch (IOException ex) {
-            // Logger would go here
+            contentType = "application/octet-stream";
         }
 
-        // Fallback to default content type if type could not be determined
-        if (contentType == null) {
-            contentType = "application/octet-stream";
+        // For WebM files
+        if (fileName.toLowerCase().endsWith(".webm")) {
+            contentType = "video/webm";
         }
 
         return ResponseEntity.ok()

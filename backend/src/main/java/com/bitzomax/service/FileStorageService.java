@@ -45,49 +45,43 @@ public class FileStorageService {
     }
 
     private String storeFile(MultipartFile file, Path storageLocation) {
-        // Normalize file name
         String originalFilename = StringUtils.cleanPath(file.getOriginalFilename());
-        
+        String fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        String filename = UUID.randomUUID().toString() + fileExtension;
+
         try {
-            // Check if the filename contains invalid characters
-            if (originalFilename.contains("..")) {
-                throw new RuntimeException("Filename contains invalid path sequence " + originalFilename);
+            if (filename.contains("..")) {
+                throw new RuntimeException("Filename contains invalid path sequence " + filename);
             }
             
-            // Generate unique file name to prevent overwriting
-            String fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
-            String newFilename = UUID.randomUUID().toString() + fileExtension;
-            
-            // Copy file to the target location
-            Path targetLocation = storageLocation.resolve(newFilename);
+            Path targetLocation = storageLocation.resolve(filename);
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
-            
-            return newFilename;
+
+            return filename;
         } catch (IOException ex) {
-            throw new RuntimeException("Could not store file " + originalFilename, ex);
+            throw new RuntimeException("Could not store file " + filename, ex);
         }
     }
 
     public Resource loadSongAsResource(String filename) {
-        return loadFileAsResource(filename, this.songStorageLocation);
+        return loadFileAsResource(filename, songStorageLocation);
     }
 
     public Resource loadCoverArtAsResource(String filename) {
-        return loadFileAsResource(filename, this.coverArtStorageLocation);
+        return loadFileAsResource(filename, coverArtStorageLocation);
     }
 
     private Resource loadFileAsResource(String filename, Path storageLocation) {
         try {
             Path filePath = storageLocation.resolve(filename).normalize();
             Resource resource = new UrlResource(filePath.toUri());
-            
             if (resource.exists()) {
                 return resource;
             } else {
-                throw new RuntimeException("File not found: " + filename);
+                throw new RuntimeException("File not found " + filename);
             }
         } catch (MalformedURLException ex) {
-            throw new RuntimeException("File not found: " + filename, ex);
+            throw new RuntimeException("File not found " + filename, ex);
         }
     }
 }

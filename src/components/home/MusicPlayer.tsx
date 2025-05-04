@@ -36,6 +36,60 @@ interface SongWithLyrics extends Song {
   isPremium?: boolean;
 }
 
+// Helper function to parse SRT content into lyrics
+const parseSRT = (srtContent: string): Lyric[] => {
+  // Split the SRT content by double newline (which separates each subtitle)
+  const subtitleBlocks = srtContent.trim().split('\n\n');
+  const lyrics: Lyric[] = [];
+
+  for (const block of subtitleBlocks) {
+    const lines = block.split('\n');
+    
+    // Skip blocks that don't have enough lines
+    if (lines.length < 3) continue;
+    
+    // Parse the timestamp line (second line)
+    // Format: 00:00:00,000 --> 00:00:05,000
+    const timeMatch = lines[1].match(/(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})/);
+    
+    if (timeMatch) {
+      // Get only the start time for now
+      const startTimeStr = timeMatch[1];
+      
+      // Convert the time format to seconds
+      const [hours, minutes, secondsAndMS] = startTimeStr.split(':');
+      const [seconds, milliseconds] = secondsAndMS.split(',');
+      
+      const timeInSeconds = 
+        parseInt(hours) * 3600 + 
+        parseInt(minutes) * 60 + 
+        parseInt(seconds) + 
+        parseInt(milliseconds) / 1000;
+      
+      // Get the text content (everything from the third line onwards)
+      const text = lines.slice(2).join(' ');
+      
+      lyrics.push({ time: timeInSeconds, text });
+    }
+  }
+  
+  return lyrics.sort((a, b) => a.time - b.time);
+};
+
+// Helper function to get the subtitle file URL
+const getSubtitleUrl = (song: Song) => {
+  if (!song.subtitlePath) return null;
+  
+  // Use either the environment variable or localhost as fallback
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
+  
+  // Make sure to encode the file name properly
+  const encodedFileName = encodeURIComponent(song.subtitlePath);
+  
+  // Construct the full URL
+  return `${baseUrl}/admin/files/subtitle/${encodedFileName}`;
+};
+
 export const MusicPlayer = () => {
   // State for the player
   const [isPlaying, setIsPlaying] = useState(false);
@@ -77,11 +131,71 @@ export const MusicPlayer = () => {
           // Check if the song is premium by checking if genre contains "Premium"
           const isPremium = song.genre?.toLowerCase().includes('premium') || false;
           
-          // For demo purposes, we'll add lyrics
+          // Initialize song with lyrics (will be replaced if SRT file exists)
           const songWithLyrics: SongWithLyrics = {
             ...song,
             isPremium: isPremium,
-            lyrics: [
+            lyrics: []
+          };
+          
+          // Check if song has a subtitle file and try to load it
+          if (song.subtitlePath) {
+            try {
+              console.log('Song has subtitle path:', song.subtitlePath);
+              const subtitleUrl = getSubtitleUrl(song);
+              console.log('Subtitle URL:', subtitleUrl);
+              
+              if (subtitleUrl) {
+                const response = await fetch(subtitleUrl);
+                
+                if (response.ok) {
+                  const srtContent = await response.text();
+                  console.log('SRT content received, length:', srtContent.length);
+                  
+                  // Parse SRT content into lyrics
+                  const parsedLyrics = parseSRT(srtContent);
+                  if (parsedLyrics.length > 0) {
+                    console.log(`Successfully loaded ${parsedLyrics.length} lyrics from SRT file`);
+                    songWithLyrics.lyrics = parsedLyrics;
+                  } else {
+                    console.warn('SRT file parsed, but no valid lyrics found. Check SRT format.');
+                  }
+                } else {
+                  console.error(`Failed to load subtitle file: HTTP ${response.status} - ${response.statusText}`);
+                  // Try direct API call without loading through Next.js
+                  console.log('Attempting direct API call...');
+                  try {
+                    const directUrl = `http://localhost:8080/api/admin/files/subtitle/${encodeURIComponent(song.subtitlePath)}`;
+                    const directResponse = await fetch(directUrl);
+                    
+                    if (directResponse.ok) {
+                      const directSrtContent = await directResponse.text();
+                      const directParsedLyrics = parseSRT(directSrtContent);
+                      if (directParsedLyrics.length > 0) {
+                        console.log(`Loaded ${directParsedLyrics.length} lyrics from direct API call`);
+                        songWithLyrics.lyrics = directParsedLyrics;
+                      }
+                    } else {
+                      console.error(`Direct API call failed: HTTP ${directResponse.status} - ${directResponse.statusText}`);
+                    }
+                  } catch (directError) {
+                    console.error('Error in direct API call:', directError);
+                  }
+                }
+              } else {
+                console.error('Failed to construct subtitle URL - subtitlePath exists but getSubtitleUrl returned null');
+              }
+            } catch (error) {
+              console.error('Error loading subtitle file:', error);
+            }
+          } else {
+            console.log('Song has no subtitle path, using default lyrics');
+          }
+          
+          // If no lyrics were loaded from SRT, use default lyrics
+          if (!songWithLyrics.lyrics || songWithLyrics.lyrics.length === 0) {
+            console.log('Using default lyrics');
+            songWithLyrics.lyrics = [
               { time: 0, text: 'Wacht op het juiste moment...' },
               { time: 5, text: 'De muziek begint te spelen' },
               { time: 10, text: `${song.title} - ${song.artist}` },
@@ -91,8 +205,8 @@ export const MusicPlayer = () => {
               { time: 30, text: 'Het ritme neemt je mee' },
               { time: 35, text: 'Laat de muziek je meenemen' },
               { time: 40, text: 'Dit is het einde van het nummer' },
-            ]
-          };
+            ];
+          }
           
           setFeaturedSong(songWithLyrics);
           setDuration(song.durationSeconds || 90); // Use actual duration if available, otherwise default to 90

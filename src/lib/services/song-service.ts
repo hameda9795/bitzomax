@@ -11,6 +11,7 @@ export interface Song {
   durationSeconds: number | null;
   filePath: string | null;
   coverArtUrl: string | null;
+  subtitlePath: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -21,7 +21,7 @@ export const FileService = {
       });
       return response.data;
     } catch (error) {
-      console.error('Error uploading song file:', error);
+      console.error('Error uploading video file:', error);
       throw error;
     }
   },
@@ -50,4 +50,4 @@ export const FileService = {
   getCoverArtUrl: (fileName: string): string => {
     return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api'}/admin/files/cover/${fileName}`;
   }
-};
+}

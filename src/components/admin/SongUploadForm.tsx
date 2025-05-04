@@ -74,27 +74,27 @@ export function SongUploadForm({ onComplete }: SongUploadFormProps) {
   const handleSongFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
-      if (file.type.startsWith("audio/")) {
+      
+      if (file.type === "video/webm") {
         setSongFile(file);
         
-        // Extract duration from the audio file
+        // Extract duration from the video file
         setExtractingMetadata(true);
-        const audio = new Audio();
-        audio.src = URL.createObjectURL(file);
+        const video = document.createElement('video');
+        video.src = URL.createObjectURL(file);
         
-        audio.onloadedmetadata = () => {
-          const durationInSeconds = Math.round(audio.duration);
+        video.onloadedmetadata = () => {
+          const durationInSeconds = Math.round(video.duration);
           setDuration(durationInSeconds.toString());
           setExtractingMetadata(false);
         };
         
-        audio.onerror = () => {
+        video.onerror = () => {
           setExtractingMetadata(false);
-          // Could not extract metadata automatically
-          console.error("Could not extract metadata from audio file");
+          console.error("Could not extract metadata from video file");
         };
       } else {
-        toast.error("Please upload a valid audio file");
+        toast.error("Please upload a WebM video file");
         e.target.value = '';
       }
     }
@@ -136,14 +136,14 @@ export function SongUploadForm({ onComplete }: SongUploadFormProps) {
           },
           onUploadProgress: (progressEvent) => {
             const progress = progressEvent.total 
-              ? Math.round((progressEvent.loaded * 70) / progressEvent.total)
+              ? Math.round((progressEvent.loaded * 75) / progressEvent.total)
               : 0;
-            setUploadProgress(progress); // Max 70% for audio upload
+            setUploadProgress(progress); // Max 75% for video upload
           }
         }
       );
 
-      const songFilePath = songUploadResponse.data.filePath;
+      const songFilePath = songUploadResponse.data.fileName;
       let coverArtUrl = null;
 
       // 2. Upload cover art if present
@@ -159,16 +159,16 @@ export function SongUploadForm({ onComplete }: SongUploadFormProps) {
               'Content-Type': 'multipart/form-data',
             },
             onUploadProgress: (progressEvent) => {
-              const baseProgress = 70;
+              const baseProgress = 75;
               const progress = progressEvent.total
-                ? baseProgress + Math.round((progressEvent.loaded * 20) / progressEvent.total)
+                ? baseProgress + Math.round((progressEvent.loaded * 25) / progressEvent.total)
                 : baseProgress;
-              setUploadProgress(progress); // Max 90% for cover upload
+              setUploadProgress(progress); // Max 100% for cover upload
             }
           }
         );
 
-        coverArtUrl = coverUploadResponse.data.filePath;
+        coverArtUrl = coverUploadResponse.data.fileName;
       }
 
       setUploadProgress(95);
@@ -339,12 +339,12 @@ export function SongUploadForm({ onComplete }: SongUploadFormProps) {
       <div className="space-y-6">
         {/* Song File */}
         <div className="space-y-2">
-          <Label htmlFor="songFile">Audio File <span className="text-red-500">*</span></Label>
+          <Label htmlFor="songFile">Video File <span className="text-red-500">*</span></Label>
           <div className="flex items-center gap-4">
             <Input
               id="songFile"
               type="file"
-              accept="audio/*"
+              accept="video/webm"
               onChange={handleSongFileChange}
               disabled={isUploading}
               className="flex-1"

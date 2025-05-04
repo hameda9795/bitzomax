@@ -30,10 +30,12 @@ public class Song {
     private Integer durationSeconds;
     
     @Column(name = "file_path")
-    private String filePath;
+    private String filePath; // Now stores WebM video file path
     
     @Column(name = "cover_art_url")
     private String coverArtUrl;
+    
+    // Subtitle path field removed as WebM has built-in subtitle support
     
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();

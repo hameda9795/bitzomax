@@ -47,6 +47,7 @@ import { toast } from "sonner";
 import { InfoIcon, LockIcon, Loader2 } from "lucide-react";
 import { useSongs } from "@/hooks/use-songs";
 import { SongService, Song } from "@/lib/services/song-service";
+import apiClient from "@/lib/services/api-client";
 
 export function SongsTable() {
   const { songs, loading, error, fetchSongs } = useSongs();
@@ -56,6 +57,7 @@ export function SongsTable() {
   const [songToDelete, setSongToDelete] = useState<number | null>(null);
   const [songToEdit, setSongToEdit] = useState<Song | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [editFormData, setEditFormData] = useState({
     title: "",
     artist: "",
@@ -63,7 +65,7 @@ export function SongsTable() {
     releaseDate: "",
     durationSeconds: ""
   });
-  
+
   const formatDuration = (seconds: number | null) => {
     if (!seconds) return "0:00";
     const minutes = Math.floor(seconds / 60);
