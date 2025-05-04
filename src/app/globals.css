@@ -188,3 +188,34 @@
     letter-spacing: var(--tracking-normal);
   }
 }
+
+/* Adding solid background for dropdown menus */
+[data-radix-popper-content-wrapper] [data-radix-menu-content] {
+  background-color: #903434 !important; /* Dark background */
+  color: #c9c2c2 !important; /* Light text for contrast */
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-color: #d4c0c0 !important;
+}
+
+/* Add solid background to each dropdown menu item */
+[data-radix-popper-content-wrapper] [role="menuitem"] {
+  background-color: #0f0101 !important; /* Dark background */
+  color: #beb9b9 !important; /* Light text color */
+}
+
+[data-radix-popper-content-wrapper] [role="menuitem"]:hover {
+  background-color: #444444 !important; /* Slightly lighter on hover */
+}
+
+/* Make dropdown menu labels solid */
+[data-radix-popper-content-wrapper] [data-slot="dropdown-menu-label"] {
+  background-color: #323232 !important; /* Dark background */
+  color: #f5f5f5 !important; /* Light text color */
+}
+
+/* Make dropdown menu separators opaque */
+[data-radix-popper-content-wrapper] [role="separator"] {
+  background-color: #444444 !important; /* Dark separator */
+  height: 1px !important;
+}

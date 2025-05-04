@@ -27,16 +27,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useUsers } from "@/hooks/use-users";
 import { User } from "@/lib/services/user-service";
@@ -238,31 +228,31 @@ export function UsersTable() {
                           Actions
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Manage User</DropdownMenuLabel>
+                      <DropdownMenuContent align="end" className="bg-[#f8f5e9] !text-[#8a7a57] border-[#d0c8a8] shadow-lg" style={{backgroundColor: "#f8f5e9", opacity: 1}}>
+                        <DropdownMenuLabel className="text-[#8a7a57]">Manage User</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => toast.info(`Viewing details for ${formatName(user)}`)}>
+                        <DropdownMenuItem onClick={() => toast.info(`Viewing details for ${formatName(user)}`)} className="bg-[#f8f5e9] hover:bg-[#e8e0c9]">
                           View Details
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleStatusChange(user.id, true)}>
+                        <DropdownMenuLabel className="text-[#8a7a57]">Change Status</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => handleStatusChange(user.id, true)} className="bg-[#f8f5e9] hover:bg-[#e8e0c9]">
                           Set Active
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleStatusChange(user.id, false)}>
+                        <DropdownMenuItem onClick={() => handleStatusChange(user.id, false)} className="bg-[#f8f5e9] hover:bg-[#e8e0c9]">
                           Set Inactive
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuLabel>Change Subscription</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleSubscriptionChange(user.id, "PREMIUM")}>
+                        <DropdownMenuLabel className="text-[#8a7a57]">Change Subscription</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => handleSubscriptionChange(user.id, "PREMIUM")} className="bg-[#f8f5e9] hover:bg-[#e8e0c9]">
                           Set Premium
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleSubscriptionChange(user.id, "FREE")}>
+                        <DropdownMenuItem onClick={() => handleSubscriptionChange(user.id, "FREE")} className="bg-[#f8f5e9] hover:bg-[#e8e0c9]">
                           Set Free
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          className="text-red-600"
+                          className="text-red-600 bg-[#f8f5e9] hover:bg-[#e8e0c9]"
                           onClick={() => setUserToDelete(user.id)}
                         >
                           Delete Account
@@ -284,26 +274,42 @@ export function UsersTable() {
       </div>
       
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the user account
-              and all associated data.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              onClick={() => userToDelete && handleDeleteUser(userToDelete)}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {!!userToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Custom solid overlay */}
+          <div 
+            className="fixed inset-0 bg-black/80" 
+            onClick={() => setUserToDelete(null)}
+          />
+          
+          {/* Modal content */}
+          <div className="relative z-50 w-full max-w-md bg-[#f8f5e9] p-6 shadow-xl">
+            <div className="mb-6 border-b border-gray-300 pb-4">
+              <h2 className="text-xl font-normal text-[#8a7a57]">Are you sure?</h2>
+              <p className="text-[#a99d7a] text-sm">
+                This action cannot be undone. This will permanently delete the user account
+                and all associated data.
+              </p>
+            </div>
+            
+            <div className="mt-6 flex justify-end gap-2">
+              <Button
+                variant="outline"
+                className="bg-[#f8f5e9] border-gray-300 text-gray-700 hover:bg-gray-200"
+                onClick={() => setUserToDelete(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="bg-red-600 hover:bg-red-700 text-white border-none"
+                onClick={() => userToDelete && handleDeleteUser(userToDelete)}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

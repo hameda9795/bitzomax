@@ -36,6 +36,24 @@ export default function SongsPage() {
         </div>
       )}
       
+      {/* Add this style tag to override Radix UI dropdown styles */}
+      <style jsx global>{`
+        [data-radix-popper-content-wrapper] [data-radix-menu-content] {
+          background-color: #f8f5e9 !important;
+          opacity: 1 !important;
+        }
+        
+        [data-radix-popper-content-wrapper] [role="menuitem"] {
+          background-color: #f8f5e9 !important;
+        }
+        
+        /* Remove any transparency effects */
+        [data-radix-popper-content-wrapper] * {
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+        }
+      `}</style>
+      
       <SongsTable />
     </div>
   );

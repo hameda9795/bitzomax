@@ -54,6 +54,14 @@ export function SongsTable() {
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [filterPremium, setFilterPremium] = useState<boolean | null>(null);
   const [songToDelete, setSongToDelete] = useState<number | null>(null);
+  const [songToEdit, setSongToEdit] = useState<Song | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    title: "",
+    artist: "",
+    genre: "",
+    releaseDate: ""
+  });
   
   // Format song duration
   const formatDuration = (seconds: number | null) => {
@@ -103,8 +111,17 @@ export function SongsTable() {
 
   // Handle song edit (in a real app, this would open an edit form)
   const handleEditSong = (id: number) => {
-    toast.info(`Editing song ${id}`);
-    // In a real application, you would open an edit form or navigate to an edit page
+    const songToEdit = songs.find(song => song.id === id);
+    if (songToEdit) {
+      setSongToEdit(songToEdit);
+      setEditFormData({
+        title: songToEdit.title || "",
+        artist: songToEdit.artist || "",
+        genre: songToEdit.genre || "",
+        releaseDate: songToEdit.releaseDate ? new Date(songToEdit.releaseDate).toISOString().split('T')[0] : ""
+      });
+      setIsEditModalOpen(true);
+    }
   };
 
   // Handle premium status toggle
@@ -318,20 +335,33 @@ export function SongsTable() {
                             Actions
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Manage Song</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleEditSong(song.id)}>
+                        <DropdownMenuContent align="end" className="z-[100]" style={{
+                          backgroundColor: "#222222", 
+                          opacity: 1, 
+                          backdropFilter: "none",
+                          WebkitBackdropFilter: "none",
+                          border: "1px solid #444444",
+                          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.8)"
+                        }}>
+                          <DropdownMenuLabel className="text-gray-300 bg-[#222222]">Manage Song</DropdownMenuLabel>
+                          <DropdownMenuSeparator className="bg-[#444444]" />
+                          <DropdownMenuItem 
+                            onClick={() => handleEditSong(song.id)} 
+                            className="text-white hover:bg-[#333333] focus:bg-[#444444] bg-[#222222]"
+                          >
                             Edit Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleTogglePremium(song.id, song)}>
+                          <DropdownMenuItem 
+                            onClick={() => handleTogglePremium(song.id, song)} 
+                            className="text-white hover:bg-[#333333] focus:bg-[#444444] bg-[#222222]"
+                          >
                             {songIsPremium 
                               ? "Make Free (Full Access)" 
                               : "Make Premium (30s Preview)"
                             }
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            className="text-red-600"
+                            className="text-red-400 hover:bg-[#333333] focus:bg-[#444444] bg-[#222222]"
                             onClick={() => setSongToDelete(song.id)}
                           >
                             Delete Song
@@ -354,26 +384,150 @@ export function SongsTable() {
       </div>
       
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!songToDelete} onOpenChange={() => setSongToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the song from
-              the platform.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              onClick={() => songToDelete && handleDeleteSong(songToDelete)}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {!!songToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Custom solid overlay */}
+          <div 
+            className="fixed inset-0 bg-black" 
+            onClick={() => setSongToDelete(null)}
+          />
+          
+          {/* Modal content */}
+          <div className="relative z-50 w-full max-w-md bg-[#f8f5e9] p-6 shadow-xl">
+            <div className="mb-6 border-b border-gray-300 pb-4">
+              <h2 className="text-xl font-normal text-[#8a7a57]">Are you sure?</h2>
+              <p className="text-[#a99d7a] text-sm">
+                This action cannot be undone. This will permanently delete the song from
+                the platform.
+              </p>
+            </div>
+            
+            <div className="mt-6 flex justify-end gap-2">
+              <Button
+                variant="outline"
+                className="bg-[#f8f5e9] border-gray-300 text-gray-700 hover:bg-gray-200"
+                onClick={() => setSongToDelete(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="bg-red-600 hover:bg-red-700 text-white border-none"
+                onClick={() => songToDelete && handleDeleteSong(songToDelete)}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Edit Song Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Custom solid overlay */}
+          <div 
+            className="fixed inset-0 bg-black" 
+            onClick={() => {
+              setIsEditModalOpen(false);
+              setSongToEdit(null);
+            }}
+          />
+          
+          {/* Modal content */}
+          <div className="relative z-50 w-full max-w-2xl bg-[#f8f5e9] p-6 shadow-xl">
+            <div className="mb-6 border-b border-gray-300 pb-4">
+              <h2 className="text-xl font-normal text-[#8a7a57]">Edit Song Details</h2>
+              <p className="text-[#a99d7a] text-sm">Make changes to the song details below.</p>
+            </div>
+            
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label htmlFor="title" className="text-right text-sm font-medium text-[#8a7a57]">
+                  Title
+                </label>
+                <Input
+                  id="title"
+                  value={editFormData.title}
+                  onChange={(e) => setEditFormData({...editFormData, title: e.target.value})}
+                  className="col-span-3 bg-white border-gray-300"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label htmlFor="artist" className="text-right text-sm font-medium text-[#8a7a57]">
+                  Artist
+                </label>
+                <Input
+                  id="artist"
+                  value={editFormData.artist}
+                  onChange={(e) => setEditFormData({...editFormData, artist: e.target.value})}
+                  className="col-span-3 bg-white border-gray-300"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label htmlFor="genre" className="text-right text-sm font-medium text-[#8a7a57]">
+                  Genre
+                </label>
+                <Input
+                  id="genre"
+                  value={editFormData.genre}
+                  onChange={(e) => setEditFormData({...editFormData, genre: e.target.value})}
+                  className="col-span-3 bg-white border-gray-300"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label htmlFor="releaseDate" className="text-right text-sm font-medium text-[#8a7a57]">
+                  Release Date
+                </label>
+                <Input
+                  id="releaseDate"
+                  type="date"
+                  value={editFormData.releaseDate}
+                  onChange={(e) => setEditFormData({...editFormData, releaseDate: e.target.value})}
+                  className="col-span-3 bg-white border-gray-300"
+                />
+              </div>
+            </div>
+            
+            <div className="mt-6 border-t border-gray-300 pt-4 flex justify-end gap-2">
+              <Button
+                variant="outline"
+                className="bg-[#f8f5e9] border-gray-300 text-gray-700 hover:bg-gray-200"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setSongToEdit(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="bg-[#b49469] hover:bg-[#96784f] text-white border-none"
+                onClick={() => {
+                  if (songToEdit) {
+                    updateSong(songToEdit.id, {
+                      ...songToEdit,
+                      title: editFormData.title,
+                      artist: editFormData.artist,
+                      genre: editFormData.genre,
+                      releaseDate: editFormData.releaseDate
+                    })
+                      .then(() => {
+                        setIsEditModalOpen(false);
+                        setSongToEdit(null);
+                        toast.success("Song details updated successfully");
+                      })
+                      .catch((error) => {
+                        console.error("Failed to update song:", error);
+                        toast.error("Failed to update song details");
+                      });
+                  }
+                }}
+              >
+                Save changes
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
