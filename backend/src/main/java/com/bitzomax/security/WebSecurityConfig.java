@@ -32,13 +32,26 @@ public class WebSecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .cors().and()
+            .cors().configurationSource(corsConfigurationSource()).and()
             .csrf().disable()
             .authorizeHttpRequests(requests -> requests
+                // WebSocket endpoints
+                .requestMatchers("/ws-endpoint/**").permitAll()
+                .requestMatchers("/topic/**").permitAll()
+                .requestMatchers("/app/**").permitAll()
+                
+                // Public API endpoints
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/home/**").permitAll() // Allow public access to home endpoints
-                .requestMatchers("/api/admin/files/upload/**").permitAll() // Allow file uploads without authentication temporarily
+                .requestMatchers("/api/home/**").permitAll()
+                .requestMatchers("/api/public/**").permitAll()
+                
+                // File upload endpoints
+                .requestMatchers("/api/admin/files/upload/**").permitAll()
+                
+                // Admin-only endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                
+                // All other endpoints require authentication
                 .anyRequest().authenticated())
             .sessionManagement()
             .sessionCreationPolicy(SessionCreationPolicy.STATELESS);
@@ -71,10 +84,14 @@ public class WebSecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("*"));
+        configuration.setAllowedOrigins(Arrays.asList(
+            "http://localhost:3000", 
+            "http://127.0.0.1:3000"
+        ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("authorization", "content-type", "x-auth-token"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "x-auth-token"));
         configuration.setExposedHeaders(Arrays.asList("x-auth-token"));
+        configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

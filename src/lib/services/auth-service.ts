@@ -135,3 +135,12 @@ export const AuthService = {
     }
   }
 };
+
+/**
+ * Gets the Authorization header with the JWT token for API requests
+ * @returns An object with the Authorization header or an empty object if no token exists
+ */
+export const getAuthHeader = (): Record<string, string> => {
+  const token = AuthService.getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};

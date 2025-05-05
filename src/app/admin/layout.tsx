@@ -182,6 +182,30 @@ export default function AdminLayout({
               >
                 Songs
               </a>
+              <a
+                href="/admin/converter"
+                className={`block px-2 py-1 rounded-md ${
+                  pathname === "/admin/converter" ? "bg-muted font-medium" : "hover:bg-muted/50"
+                }`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  router.push('/admin/converter');
+                }}
+              >
+                Video Converter
+              </a>
+              <a
+                href="/admin/troubleshoot"
+                className={`block px-2 py-1 rounded-md ${
+                  pathname === "/admin/troubleshoot" ? "bg-muted font-medium" : "hover:bg-muted/50"
+                }`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  router.push('/admin/troubleshoot');
+                }}
+              >
+                Troubleshooting
+              </a>
             </nav>
           </aside>
           

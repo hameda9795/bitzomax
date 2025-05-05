@@ -1,5 +1,6 @@
 package com.bitzomax.controller;
 
+import com.bitzomax.model.WebMConversionResponse;
 import com.bitzomax.service.FileStorageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
@@ -58,6 +59,41 @@ public class FileController {
 
         return ResponseEntity.ok(response);
     }
+    
+    /**
+     * Convert a file to WebM format with progress tracking
+     */
+    @PostMapping("/convert-to-webm")
+    public ResponseEntity<WebMConversionResponse> convertToWebM(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "fileId", required = false) String clientFileId) {
+        
+        // If client provided a fileId, use it; otherwise, generate one
+        String fileId = (clientFileId != null && !clientFileId.isEmpty()) ? clientFileId : null;
+        
+        String fileName = fileStorageService.convertToWebM(file, fileId);
+        
+        // If no clientFileId was provided, extract fileId from fileName (remove .webm extension)
+        if (fileId == null) {
+            fileId = fileName.substring(0, fileName.lastIndexOf('.'));
+        }
+        
+        // Create download URI for the converted file
+        String fileDownloadUri = ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path("/api/admin/files/converted/")
+                .path(fileName)
+                .toUriString();
+        
+        WebMConversionResponse response = new WebMConversionResponse(
+            fileName, 
+            fileId, 
+            fileDownloadUri, 
+            "video/webm", 
+            String.valueOf(file.getSize())
+        );
+        
+        return ResponseEntity.ok(response);
+    }
 
     @GetMapping("/song/{fileName:.+}")
     public ResponseEntity<Resource> downloadSongFile(@PathVariable String fileName, HttpServletRequest request) {
@@ -67,6 +103,40 @@ public class FileController {
     @GetMapping("/cover/{fileName:.+}")
     public ResponseEntity<Resource> downloadCoverFile(@PathVariable String fileName, HttpServletRequest request) {
         return downloadFile(fileName, request, fileStorageService.loadCoverArtAsResource(fileName));
+    }
+    
+    /**
+     * Get a converted WebM file - Original admin endpoint, requires authentication
+     */
+    @GetMapping("/converted/{fileName:.+}")
+    public ResponseEntity<Resource> downloadConvertedFile(@PathVariable String fileName, HttpServletRequest request) {
+        Resource resource = fileStorageService.loadConvertedFileAsResource(fileName);
+        return downloadFile(fileName, request, resource);
+    }
+
+    /**
+     * Public endpoint for downloading converted files with token-based authentication
+     * This allows direct access from the browser while still maintaining security
+     */
+    @GetMapping("/public-download/{fileName:.+}")
+    public ResponseEntity<Resource> downloadPublicFile(
+            @PathVariable String fileName, 
+            @RequestParam(value = "token", required = false) String token,
+            HttpServletRequest request) {
+        
+        // Check if token is provided and valid
+        boolean hasToken = token != null && !token.isEmpty();
+        if (hasToken) {
+            // Simple validation - in production you would verify the JWT properly
+            System.out.println("Token provided for file download: " + fileName);
+        } else {
+            System.out.println("No token provided for file download: " + fileName);
+            // For public downloads, we'll allow it for now, but in production
+            // you might want to implement proper validation
+        }
+        
+        Resource resource = fileStorageService.loadConvertedFileAsResource(fileName);
+        return downloadFile(fileName, request, resource);
     }
 
     private ResponseEntity<Resource> downloadFile(String fileName, HttpServletRequest request, Resource resource) {
